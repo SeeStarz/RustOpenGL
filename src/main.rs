@@ -1,83 +1,61 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use beryllium::*;
-use ogl33::*;
-use rand::prelude::*;
+use glfw::{Action, Context, Key};
 
 fn main() {
-    let sdl = Sdl::init(init::InitFlags::EVERYTHING);
+    // Initialize GLFW
+    let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
 
-    sdl.set_gl_context_major_version(3).unwrap();
-    sdl.set_gl_context_minor_version(3).unwrap();
-    sdl.set_gl_profile(video::GlProfile::Core).unwrap();
-    {
-        sdl.set_gl_context_flags(video::GlContextFlags::FORWARD_COMPATIBLE)
-            .unwrap();
-    }
+    // Set version to 3.3 with core profile
+    glfw.window_hint(glfw::WindowHint::ContextVersionMajor(3));
+    glfw.window_hint(glfw::WindowHint::ContextVersionMinor(3));
+    glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+        glfw::OpenGlProfileHint::Core,
+    ));
 
-    let win_args = video::CreateWinArgs {
-        title: "Your Mother",
-        width: 800,
-        height: 600,
-        allow_high_dpi: true,
-        borderless: true,
-        resizable: true,
-    };
+    // Initialize Window
+    let (mut window, events) = glfw
+        .create_window(
+            1600,
+            900,
+            "Hello this is microsoft",
+            glfw::WindowMode::Windowed,
+        )
+        .expect("Failed to create GLFW window.");
 
-    let win = sdl
-        .create_gl_window(win_args)
-        .expect("couldn't make a window and context");
+    // Load opengl functions via GLAD
+    gl_loader::init_gl();
+    // Note that *const _ is basically constant void pointer
+    // gl::load_with(|symbol| gl_loader::get_proc_address(symbol) as *const _);
+    gl::load_with(|symbol| window.get_proc_address(symbol));
 
-    unsafe {
-        load_gl_with(|f_name| win.get_proc_address(f_name.cast()));
-
-        let mut vao = 0;
-        glGenVertexArrays(1, &mut vao);
-        assert_ne!(vao, 0);
-
-        let mut vbo = 0;
-        glGenBuffers(1, &mut vbo);
-        assert_ne!(vbo, 0);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    }
-
-    type Vertex = [f32; 3];
-    const VERTICES: [Vertex; 3] = [[-0.5, -0.5, 0.0], [0.5, -0.5, 0.0], [0.0, 0.5, 0.0]];
+    // Set the window as the current context
+    window.set_key_polling(true);
+    window.make_current();
 
     unsafe {
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            size_of_val(&VERTICES) as isize,
-            VERTICES.as_ptr().cast(),
-            GL_STATIC_DRAW,
-        );
+        gl::Viewport(0, 0, 800, 600);
     }
 
-    let mut rng = thread_rng();
-    let mut c = 0;
-    let mut r: GLfloat = 0.0;
-    let mut g: GLfloat = 0.0;
-    let mut b: GLfloat = 0.0;
-    'main_loop: loop {
-        // handle this frame's event
-        while let Some(event) = sdl.poll_events() {
-            match event {
-                (events::Event::Quit, _) => break 'main_loop,
-                _ => (),
-            }
+    // Main loop
+    while !window.should_close() {
+        glfw.poll_events();
+        for (_, event) in glfw::flush_messages(&events) {
+            handle_window_event(&mut window, event);
         }
-        if c % 10 == 0 {
-            r = rng.gen();
-            g = rng.gen();
-            b = rng.gen();
-        }
+
         unsafe {
-            glClearColor(r, g, b, 1.0);
-            glClear(GL_COLOR_BUFFER_BIT);
+            gl::ClearColor(0.2, 0.0, 0.2, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
         }
-        c = c + 1;
-        win.swap_window();
+
+        window.swap_buffers();
     }
-    println!("Hello, world!");
-    println!("Bruh");
+}
+
+fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
+    match event {
+        glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
+            window.set_should_close(true);
+        }
+        _ => {}
+    }
 }
