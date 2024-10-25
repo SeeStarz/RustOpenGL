@@ -21,10 +21,7 @@ fn main() {
         )
         .expect("Failed to create GLFW window.");
 
-    // Load opengl functions via GLAD
-    gl_loader::init_gl();
-    // Note that *const _ is basically constant void pointer
-    // gl::load_with(|symbol| gl_loader::get_proc_address(symbol) as *const _);
+    // Load OpenGL function pointers
     gl::load_with(|symbol| window.get_proc_address(symbol));
 
     // Set the window as the current context
