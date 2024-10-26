@@ -1,3 +1,4 @@
+use gl::types::GLint;
 use glfw::{Action, Context, Key};
 use std::ptr;
 
@@ -15,8 +16,8 @@ fn main() {
     // Initialize Window
     let (mut window, events) = glfw
         .create_window(
-            1600,
-            900,
+            800,
+            800,
             "Hello this is microsoft",
             glfw::WindowMode::Windowed,
         )
@@ -29,7 +30,19 @@ fn main() {
     window.set_key_polling(true);
     window.make_current();
 
-    let vertices: [f32; 9] = [0.0, 0.5, 0.0, -0.5, -0.5, 0.0, 0.5, -0.5, 0.0];
+    #[rustfmt::skip]
+    let vertices: [f32; 12] = [
+        -0.5, -0.5, 0.,
+        -0.5, 0.5, 0.,
+        0.5, -0.5, 0.,
+        0.5, 0.5, 0.,
+    ];
+    #[rustfmt::skip]
+    let indices: [i32; 6] = [
+        0, 1, 2,
+        1, 2, 3,
+    ];
+
     let vs_source: &str = "#version 330 core
 layout (location = 0) in vec3 pos;
 
@@ -47,7 +60,7 @@ void main()
 } \0";
 
     let (shader_program, vao) = unsafe {
-        gl::Viewport(0, 0, 800, 600);
+        gl::Viewport(0, 0, 800, 800);
         let vertex_shader = gl::CreateShader(gl::VERTEX_SHADER);
         assert_ne!(vertex_shader, 0);
         gl::ShaderSource(
@@ -107,8 +120,16 @@ void main()
             vertices.as_ptr() as *const _,
             gl::STATIC_DRAW,
         );
-        println!("{}", size_of_val(&vertices));
-        println!("{}", size_of_val(&vertices[0]));
+
+        let mut ebo = 0;
+        gl::GenBuffers(1, &mut ebo);
+        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
+        gl::BufferData(
+            gl::ELEMENT_ARRAY_BUFFER,
+            size_of_val(&indices) as isize,
+            indices.as_ptr() as *const _,
+            gl::STATIC_DRAW,
+        );
 
         gl::VertexAttribPointer(
             0,
@@ -118,7 +139,6 @@ void main()
             3 * size_of::<f32>() as i32,
             ptr::null(),
         );
-        println!("{}", 3 * size_of::<f32>() as i32);
 
         gl::EnableVertexAttribArray(0);
 
@@ -138,7 +158,8 @@ void main()
 
             gl::UseProgram(shader_program);
             gl::BindVertexArray(vao);
-            gl::DrawArrays(gl::TRIANGLES, 0, 3);
+            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
+            gl::BindVertexArray(0);
         }
 
         window.swap_buffers();
