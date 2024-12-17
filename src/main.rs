@@ -65,13 +65,13 @@ fn main() {
         gl::BindVertexArray(vao);
 
         // Create vertex buffer object
-        let mut vbo1 = 0;
-        gl::GenBuffers(1, &mut vbo1);
-        gl::BindBuffer(gl::ARRAY_BUFFER, vbo1);
+        let mut vbo = 0;
+        gl::GenBuffers(1, &mut vbo);
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
         gl::BufferData(
             gl::ARRAY_BUFFER,
             (size_of_val(&vertices)) as isize,
-            vertices.as_ptr() as *const _,
+            vertices.as_ptr() as *const c_void,
             gl::STATIC_DRAW,
         );
 
