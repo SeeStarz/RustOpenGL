@@ -1,8 +1,10 @@
 use gl::types::*;
 use glfw::{Action, Context, Key};
 use std::ffi::c_void;
+use std::path::Path;
 use std::ptr;
 use utils::Shader;
+extern crate image;
 
 pub mod utils;
 
@@ -37,6 +39,9 @@ fn main() {
     window.set_key_polling(true);
     window.make_current();
 
+    // Allow resize of window
+    window.set_size_callback(change_window_size);
+
     // Set the viewport
     unsafe {
         gl::Viewport(0, 0, WIDTH as GLint, HEIGHT as GLint);
@@ -44,17 +49,18 @@ fn main() {
 
     // Declare the vertices as the whole screen
     #[rustfmt::skip]
-    let vertices: [f32; 12] = [
-        -1.0, -1.0,
-        -1.0, 1.0,
-        1.0, -1.0,
-        -1.0, 1.0,
-        1.0, -1.0,
-        1.0, 1.0,
+    let vertices= [
+        //Positions //Textures
+        -0.5, -0.5, 0.0, 0.0,
+        -0.5,  0.5, 0.0, 1.0,
+         0.5, -0.5, 1.0, 0.0,
+        -0.5,  0.5, 0.0, 1.0,
+         0.5, -0.5, 1.0, 0.0,
+         0.5,  0.5, 1.0, 1.0f32,
     ];
 
     // Obtain the shader program and vertex array object
-    let (shader_program, vao) = unsafe {
+    let (shader_program, vao, texture) = unsafe {
         // Create shader from file
         let shader_class =
             Shader::new("vertex.glsl", "fragment.glsl").expect("Cannot create shader class");
@@ -76,34 +82,67 @@ fn main() {
         );
 
         // Create vertex attribute pointer
+        // This one is for position
         gl::VertexAttribPointer(
             0,
             2,
             gl::FLOAT,
             gl::FALSE,
-            2 * size_of_val(&vertices[0]) as i32,
+            4 * size_of_val(&vertices[0]) as i32,
             ptr::null::<c_void>(),
         );
         gl::EnableVertexAttribArray(0);
+
+        // This one is for texture
+        gl::VertexAttribPointer(
+            1,
+            2,
+            gl::FLOAT,
+            gl::FALSE,
+            4 * size_of_val(&vertices[0]) as i32,
+            (2 * size_of_val(&vertices[0])) as *const c_void,
+            // ptr::null::<c_void>(),
+        );
+        gl::EnableVertexAttribArray(1);
+
+        // Create texture
+        let img = image::open(Path::new("./container.jpg")).expect("Cannot load texture image.");
+        let data = img
+            .as_flat_samples_u8()
+            .expect("Cannot flatten texture image.");
+
+        let mut texture = 0;
+        gl::GenTextures(1, &mut texture);
+        gl::BindTexture(gl::TEXTURE_2D, texture);
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RGB as i32,
+            img.width() as i32,
+            img.height() as i32,
+            0,
+            gl::RGB,
+            gl::UNSIGNED_BYTE,
+            data.samples.as_ptr() as *const c_void,
+        );
+        gl::GenerateMipmap(gl::TEXTURE_2D);
+
+        // Set texture options
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(
+            gl::TEXTURE_2D,
+            gl::TEXTURE_MIN_FILTER,
+            gl::LINEAR_MIPMAP_LINEAR as i32,
+        );
 
         // Unbind vertex array object
         gl::BindVertexArray(0);
         // Return shader program and vertex array object
 
-        (shader_class.get(), vao)
+        (shader_class.get(), vao, texture)
     };
-
-    // Pass window size
-    unsafe {
-        let window_size_location =
-            gl::GetUniformLocation(shader_program, "windowSize\0".as_ptr() as *const i8);
-        gl::UseProgram(shader_program);
-        gl::Uniform2f(window_size_location, WIDTH as f32, HEIGHT as f32);
-        gl::UseProgram(0);
-    }
-
-    // Start time counter
-    let time_start = std::time::Instant::now();
 
     // Main loop
     while !window.should_close() {
@@ -118,15 +157,13 @@ fn main() {
             gl::ClearColor(1., 1., 1., 1.);
             gl::Clear(gl::COLOR_BUFFER_BIT);
 
-            gl::UseProgram(shader_program);
+            gl::BindTexture(gl::TEXTURE_2D, texture);
             gl::BindVertexArray(vao);
+            gl::UseProgram(shader_program);
+
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
 
-            let value_location =
-                gl::GetUniformLocation(shader_program, "time\0".as_ptr() as *const i8);
-            let time_elapsed = time_start.elapsed().as_millis() as f32 / 1000.0;
-            gl::Uniform1f(value_location, time_elapsed);
-
+            gl::BindTexture(gl::TEXTURE_2D, 0);
             gl::BindVertexArray(0);
             gl::UseProgram(0);
         }
@@ -143,5 +180,12 @@ fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
             window.set_should_close(true);
         }
         _ => {}
+    }
+}
+
+// Change window size
+fn change_window_size(_window: &mut glfw::Window, width: i32, height: i32) {
+    unsafe {
+        gl::Viewport(0, 0, width, height);
     }
 }
