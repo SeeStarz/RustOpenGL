@@ -3,6 +3,7 @@ use glfw::{Action, Context, Key};
 use std::ffi::c_void;
 use std::path::Path;
 use std::ptr;
+use std::time;
 use utils::Shader;
 extern crate image;
 
@@ -60,10 +61,10 @@ fn main() {
     ];
 
     // Obtain the shader program and vertex array object
-    let (shader_program, vao, texture) = unsafe {
+    let (shader_program, vao, texture1, texture2) = unsafe {
         // Create shader from file
-        let shader_class =
-            Shader::new("vertex.glsl", "fragment.glsl").expect("Cannot create shader class");
+        let shader_class = Shader::from_file(Path::new("vertex.glsl"), Path::new("fragment.glsl"))
+            .expect("Cannot create shader class");
 
         // Create vertex array object
         let mut vao = 0;
@@ -105,15 +106,20 @@ fn main() {
         );
         gl::EnableVertexAttribArray(1);
 
-        // Create texture
+        // Create the container texture
         let img = image::open(Path::new("./container.jpg")).expect("Cannot load texture image.");
         let data = img
             .as_flat_samples_u8()
             .expect("Cannot flatten texture image.");
 
-        let mut texture = 0;
-        gl::GenTextures(1, &mut texture);
-        gl::BindTexture(gl::TEXTURE_2D, texture);
+        let mut texture1 = 0;
+
+        gl::GenTextures(1, &mut texture1);
+
+        // Active texture is 0 by default
+        gl::ActiveTexture(gl::TEXTURE0);
+
+        gl::BindTexture(gl::TEXTURE_2D, texture1);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
@@ -126,6 +132,33 @@ fn main() {
             data.samples.as_ptr() as *const c_void,
         );
         gl::GenerateMipmap(gl::TEXTURE_2D);
+        gl::BindTexture(gl::TEXTURE_2D, 0);
+
+        // Create the moai texture
+        let img = image::open(Path::new("./moai.png")).expect("Cannot load texture image.");
+        let data = img
+            .as_flat_samples_u8()
+            .expect("Cannot flatten texture image.");
+
+        let mut texture2 = 0;
+        gl::GenTextures(1, &mut texture2);
+
+        gl::ActiveTexture(gl::TEXTURE1);
+
+        gl::BindTexture(gl::TEXTURE_2D, texture2);
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RGBA as i32,
+            img.width() as i32,
+            img.height() as i32,
+            0,
+            gl::RGBA,
+            gl::UNSIGNED_BYTE,
+            data.samples.as_ptr() as *const c_void,
+        );
+        gl::GenerateMipmap(gl::TEXTURE_2D);
+        gl::BindTexture(gl::TEXTURE_2D, 0);
 
         // Set texture options
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
@@ -139,9 +172,27 @@ fn main() {
 
         // Unbind vertex array object
         gl::BindVertexArray(0);
+        gl::ActiveTexture(gl::TEXTURE0);
         // Return shader program and vertex array object
 
-        (shader_class.get(), vao, texture)
+        (shader_class.get(), vao, texture1, texture2)
+    };
+
+    let start_time = time::Instant::now();
+    let time_uniform =
+        unsafe { gl::GetUniformLocation(shader_program, "transparency\0".as_ptr() as *const i8) };
+
+    unsafe {
+        gl::UseProgram(shader_program);
+        gl::Uniform1i(
+            gl::GetUniformLocation(shader_program, "texture1\0".as_ptr() as *const i8),
+            0,
+        );
+        gl::Uniform1i(
+            gl::GetUniformLocation(shader_program, "texture2\0".as_ptr() as *const i8),
+            1,
+        );
+        gl::UseProgram(0);
     };
 
     // Main loop
@@ -157,12 +208,20 @@ fn main() {
             gl::ClearColor(1., 1., 1., 1.);
             gl::Clear(gl::COLOR_BUFFER_BIT);
 
-            gl::BindTexture(gl::TEXTURE_2D, texture);
+            gl::ActiveTexture(gl::TEXTURE0);
+            gl::BindTexture(gl::TEXTURE_2D, texture1);
+            gl::ActiveTexture(gl::TEXTURE1);
+            gl::BindTexture(gl::TEXTURE_2D, texture2);
             gl::BindVertexArray(vao);
             gl::UseProgram(shader_program);
 
+            gl::Uniform1f(time_uniform, start_time.elapsed().as_secs_f32());
+
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
 
+            gl::ActiveTexture(gl::TEXTURE1);
+            gl::BindTexture(gl::TEXTURE_2D, 0);
+            gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, 0);
             gl::BindVertexArray(0);
             gl::UseProgram(0);
