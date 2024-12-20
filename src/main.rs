@@ -1,5 +1,6 @@
 use gl::types::*;
 use glfw::{Action, Context, Key};
+use image::metadata::Orientation;
 use std::ffi::c_void;
 use std::path::Path;
 use std::ptr;
@@ -135,7 +136,8 @@ fn main() {
         gl::BindTexture(gl::TEXTURE_2D, 0);
 
         // Create the moai texture
-        let img = image::open(Path::new("./moai.png")).expect("Cannot load texture image.");
+        let mut img = image::open(Path::new("./moai.png")).expect("Cannot load texture image.");
+        img.apply_orientation(Orientation::FlipVertical);
         let data = img
             .as_flat_samples_u8()
             .expect("Cannot flatten texture image.");
@@ -183,6 +185,7 @@ fn main() {
         unsafe { gl::GetUniformLocation(shader_program, "transparency\0".as_ptr() as *const i8) };
 
     unsafe {
+        // Set texture uniforms
         gl::UseProgram(shader_program);
         gl::Uniform1i(
             gl::GetUniformLocation(shader_program, "texture1\0".as_ptr() as *const i8),
