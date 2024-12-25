@@ -12,8 +12,6 @@ pub mod utils;
 const WIDTH: u32 = 800;
 const HEIGHT: u32 = 800;
 
-static mut OPACITY: f32 = 0.2;
-
 fn main() {
     // Initialize GLFW
     let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
@@ -55,11 +53,11 @@ fn main() {
     let vertices= [
         //Positions //Textures
         -0.5, -0.5, 0.0, 0.0,
-        -0.5,  0.5, 0.0, 1.0,
-         0.5, -0.5, 1.0, 0.0,
-        -0.5,  0.5, 0.0, 1.0,
-         0.5, -0.5, 1.0, 0.0,
-         0.5,  0.5, 1.0, 1.0f32,
+        -0.5,  0.5, 0.0, 2.0,
+         0.5, -0.5, 2.0, 0.0,
+        -0.5,  0.5, 0.0, 2.0,
+         0.5, -0.5, 2.0, 0.0,
+         0.5,  0.5, 2.0, 2.0f32,
     ];
 
     // Obtain the shader program and vertex array object
@@ -136,14 +134,8 @@ fn main() {
         gl::GenerateMipmap(gl::TEXTURE_2D);
 
         // Set texture options (texture must still be bound)
-        gl::TexParameteri(
-            gl::TEXTURE_2D,
-            gl::TEXTURE_MIN_FILTER,
-            gl::NEAREST_MIPMAP_NEAREST as i32,
-        );
-
-        // The mag filter is the important one because small texture and big screen
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
 
         gl::BindTexture(gl::TEXTURE_2D, 0);
 
@@ -196,9 +188,6 @@ fn main() {
         gl::UseProgram(0);
     };
 
-    let transparency_location =
-        unsafe { gl::GetUniformLocation(shader_program, "transparency\0".as_ptr() as *const i8) };
-
     // Main loop
     while !window.should_close() {
         // Poll events
@@ -218,8 +207,6 @@ fn main() {
             gl::BindTexture(gl::TEXTURE_2D, texture2);
             gl::BindVertexArray(vao);
             gl::UseProgram(shader_program);
-
-            gl::Uniform1f(transparency_location, OPACITY);
 
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
 
@@ -242,12 +229,6 @@ fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
         glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
             window.set_should_close(true);
         }
-        glfw::WindowEvent::Key(Key::Up, _, Action::Press, _) => unsafe {
-            OPACITY = if OPACITY < 0.9 { OPACITY + 0.1 } else { 1.0 };
-        },
-        glfw::WindowEvent::Key(Key::Down, _, Action::Press, _) => unsafe {
-            OPACITY = if OPACITY > 0.1 { OPACITY - 0.1 } else { 0.0 };
-        },
         _ => {}
     }
 }
